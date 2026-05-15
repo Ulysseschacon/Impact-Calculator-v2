@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Impact Calculator</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.0/jspdf.plugin.autotable.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    background: #f3f4f6;
+    color: #1f2937;
+  }
+  header {
+    background: linear-gradient(135deg, #0078d4, #005a9e);
+    color: white;
+    padding: 24px 32px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  }
+  header h1 { margin: 0; font-size: 24px; }
+  header p { margin: 4px 0 0; opacity: 0.9; font-size: 14px; }
+  .container { max-width: 1200px; margin: 24px auto; padding: 0 24px; }
+  .card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .card h2 {
+    margin: 0 0 16px;
+    color: #005a9e;
+    font-size: 18px;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 8px;
+  }
+  .instructions {
+    background: #eff6ff;
+    border-left: 4px solid #0078d4;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  .instructions ul { margin: 8px 0 0; padding-left: 20px; }
+  .instructions li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th, td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  th {
+    background: #f9fafb;
+    font-weight: 600;
+    font-size: 13px;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  td input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  td input:focus {
+    outline: none;
+    border-color: #0078d4;
+    box-shadow: 0 0 0 2px rgba(0,120,212,0.2);
+  }
+  .impact-cell {
+    font-weight: 600;
+    color: #059669;
+    text-align: right;
+  }
+  .row-num { color: #9ca3af; width: 40px; text-align: center; font-size: 13px; }
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.15s;
+  }
+  .btn-primary { background: #0078d4; color: white; }
+  .btn-primary:hover { background: #005a9e; }
+  .btn-secondary { background: #e5e7eb; color: #374151; }
+  .btn-secondary:hover { background: #d1d5db; }
+  .btn-danger { background: #fef2f2; color: #b91c1c; }
+  .btn-danger:hover { background: #fee2e2; }
+  .totals-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding: 16px;
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+    border: 1px solid #86efac;
+    border-radius: 6px;
+  }
+  .totals-label { font-weight: 600; color: #166534; font-size: 16px; }
+  .totals-value { font-size: 22px; font-weight: 700; color: #15803d; }
+  .copilot-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .field-group label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-size: 14px;
+    color: #374151;
+  }
+  .field-group input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  .assumptions {
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    padding: 12px 16px;
+    margin-top: 16px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .assumptions strong { color: #92400e; }
+  .grand-total {
+    margin-top: 24px;
+    padding: 20px;
+    background: linear-gradient(135deg, #1e3a8a, #1e40af);
+    color: white;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .grand-total .label { font-size: 18px; font-weight: 500; }
+  .grand-total .value { font-size: 28px; font-weight: 700; }
+  .actions-footer {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .actions-footer button { padding: 10px 20px; font-size: 15px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Impact Calculator</h1>
+  <p>Calculate customer pricing impact and Copilot productivity savings</p>
+</header>
+
+<div class="container">
+
+  <!-- Pricing Impact Section -->
+  <div class="card">
+    <h2>Pricing Impact Calculator</h2>
+
+    <div class="instructions">
+      <strong>Instructions — Source from the MS Configurator:</strong>
+      <ul>
+        <li><strong>MSRP Price</strong> — Please copy variables from Column H from the MS Configurator</li>
+        <li><strong>Customer Purchase Price</strong> — Please copy variables from Column S from the MS Configurator</li>
+        <li><strong>Qty</strong> — Please copy variables from Column X from the MS Configurator</li>
+      </ul>
+      <em>Impact per row = (MSRP − Customer Purchase Price) × Qty</em>
+      <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #93c5fd;">
+        <strong>💡 Excel-style paste:</strong> Select a column in Excel (or the MS Configurator), copy it,
+        then click the first cell of the matching column below and paste — values fill down automatically,
+        adding new rows as needed. Do this three times (once per column).
+      </div>
+    </div>
+
+    <table id="impactTable">
+      <thead>
+        <tr>
+          <th class="row-num">#</th>
+          <th>MSRP Price</th>
+          <th>Customer Purchase Price</th>
+          <th>Qty</th>
+          <th style="text-align:right;">Impact Total</th>
+        </tr>
+      </thead>
+      <tbody id="impactBody"></tbody>
+    </table>
+
+    <div class="actions">
+      <button class="btn-secondary" onclick="addRow()">+ Add Row</button>
+      <button class="btn-danger" onclick="resetImpact()">Reset Rows</button>
+    </div>
+
+    <div class="totals-bar">
+      <span class="totals-label">Total Pricing Impact</span>
+      <span class="totals-value" id="impactTotal">$0.00</span>
+    </div>
+  </div>
+
+  <!-- Copilot Productivity Savings -->
+  <div class="card">
+    <h2>Copilot Productivity Savings</h2>
+
+    <div class="instructions">
+      Enter the quantity of Microsoft 365 Copilot licenses. The calculator multiplies by <strong>$3,561.60</strong>
+      to provide the total productivity savings value.
+    </div>
+
+    <div class="copilot-row">
+      <div class="field-group">
+        <label for="copilotQty">Qty of Copilot Licenses</label>
+        <input type="number" id="copilotQty" min="0" step="1" placeholder="e.g. 270" oninput="recalc()" />
+      </div>
+      <div class="field-group">
+        <label>Total Productivity Savings Value</label>
+        <input type="text" id="copilotTotal" value="$0.00" readonly style="background:#f9fafb; font-weight:600; color:#059669;" />
+      </div>
+    </div>
+
+    <div class="assumptions">
+      <strong>Assumptions used in $3,561.60 per license:</strong>
+      <ul style="margin:6px 0 0; padding-left:20px;">
+        <li>Copilot adoption rate = 70%</li>
+        <li>Copilot monthly hourly productivity savings = 8 hours</li>
+        <li>Average annual salary = $53/hour</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Grand Total -->
+  <div class="grand-total">
+    <span class="label">Combined Total Impact</span>
+    <span class="value" id="grandTotal">$0.00</span>
+  </div>
+
+  <!-- Export / Reset Footer -->
+  <div class="actions-footer">
+    <button class="btn-danger" onclick="resetAll()">Reset All</button>
+    <button class="btn-secondary" onclick="exportExcel()">Export to Excel</button>
+    <button class="btn-primary" onclick="exportPDF()">Export to PDF</button>
+  </div>
+
+</div>
+
+<script>
+  const COPILOT_RATE = 3561.60;
+  const STARTING_ROWS = 15;
+
+  function fmtCurrency(n) {
+    if (isNaN(n) || n === null) n = 0;
+    return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+  }
+
+  function addRow() {
+    const tbody = document.getElementById('impactBody');
+    const idx = tbody.children.length + 1;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="row-num">${idx}</td>
+      <td><input type="number" step="any" min="0" class="msrp" oninput="recalc()" onpaste="handlePaste(event, 'msrp')" /></td>
+      <td><input type="number" step="any" min="0" class="cpp" oninput="recalc()" onpaste="handlePaste(event, 'cpp')" /></td>
+      <td><input type="number" step="1" min="0" class="qty" oninput="recalc()" onpaste="handlePaste(event, 'qty')" /></td>
+      <td class="impact-cell">$0.00</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  // Excel-style paste: if user pastes a column of values, fill down across rows
+  function handlePaste(event, colClass) {
+    const clipboard = (event.clipboardData || window.clipboardData).getData('text');
+    if (!clipboard) return;
+
+    // Split on newlines; preserve empty cells so row alignment is maintained
+    let values = clipboard.split(/\r\n|\r|\n/).map(v => v.trim());
+
+    // Trim trailing empty entries (Excel often adds a final newline)
+    while (values.length > 0 && values[values.length - 1] === '') values.pop();
+
+    // If only a single value, let the browser handle the paste normally
+    if (values.length <= 1) return;
+
+    event.preventDefault();
+
+    // Find the row that contains the input being pasted into
+    const inputEl = event.target;
+    const startRow = inputEl.closest('tr').rowIndex - 1; // header is row 0
+
+    // Make sure we have enough rows
+    const tbody = document.getElementById('impactBody');
+    const needed = startRow + values.length;
+    while (tbody.children.length < needed) addRow();
+
+    // Fill values down the matching column.
+    // Empty / non-numeric entries default to 0 so row alignment is preserved
+    // (otherwise blank Qty cells would shift later values up and miscalculate impact).
+    const rows = tbody.querySelectorAll('tr');
+    values.forEach((val, i) => {
+      const clean = val.replace(/[$,\s%]/g, '');
+      const num = parseFloat(clean);
+      const target = rows[startRow + i].querySelector('.' + colClass);
+      if (target) target.value = isNaN(num) ? 0 : num;
+    });
+
+    recalc();
+  }
+
+  function renumberRows() {
+    document.querySelectorAll('#impactBody tr').forEach((tr, i) => {
+      tr.querySelector('.row-num').textContent = i + 1;
+    });
+  }
+
+  function recalc() {
+    let total = 0;
+    document.querySelectorAll('#impactBody tr').forEach(tr => {
+      const msrp = parseFloat(tr.querySelector('.msrp').value) || 0;
+      const cpp = parseFloat(tr.querySelector('.cpp').value) || 0;
+      const qty = parseFloat(tr.querySelector('.qty').value) || 0;
+      const impact = (msrp - cpp) * qty;
+      tr.querySelector('.impact-cell').textContent = fmtCurrency(impact);
+      total += impact;
+    });
+    document.getElementById('impactTotal').textContent = fmtCurrency(total);
+
+    const cpQty = parseFloat(document.getElementById('copilotQty').value) || 0;
+    const cpTotal = cpQty * COPILOT_RATE;
+    document.getElementById('copilotTotal').value = fmtCurrency(cpTotal);
+
+    document.getElementById('grandTotal').textContent = fmtCurrency(total + cpTotal);
+  }
+
+  function resetImpact() {
+    document.getElementById('impactBody').innerHTML = '';
+    for (let i = 0; i < STARTING_ROWS; i++) addRow();
+    recalc();
+  }
+
+  function resetAll() {
+    resetImpact();
+    document.getElementById('copilotQty').value = '';
+    recalc();
+  }
+
+  function collectData() {
+    const rows = [];
+    document.querySelectorAll('#impactBody tr').forEach((tr, i) => {
+      const msrp = parseFloat(tr.querySelector('.msrp').value) || 0;
+      const cpp = parseFloat(tr.querySelector('.cpp').value) || 0;
+      const qty = parseFloat(tr.querySelector('.qty').value) || 0;
+      const impact = (msrp - cpp) * qty;
+      if (msrp || cpp || qty) {
+        rows.push({ row: i + 1, msrp, cpp, qty, impact });
+      }
+    });
+    const impactTotal = rows.reduce((s, r) => s + r.impact, 0);
+    const cpQty = parseFloat(document.getElementById('copilotQty').value) || 0;
+    const cpTotal = cpQty * COPILOT_RATE;
+    return { rows, impactTotal, cpQty, cpTotal, grandTotal: impactTotal + cpTotal };
+  }
+
+  function exportExcel() {
+    const data = collectData();
+    const wb = XLSX.utils.book_new();
+
+    // Pricing Impact sheet
+    const impactRows = [
+      ['Pricing Impact Calculator'],
+      [],
+      ['Row', 'MSRP Price', 'Customer Purchase Price', 'Qty', 'Impact Total']
+    ];
+    data.rows.forEach(r => impactRows.push([r.row, r.msrp, r.cpp, r.qty, r.impact]));
+    impactRows.push([]);
+    impactRows.push(['', '', '', 'Total Pricing Impact', data.impactTotal]);
+    const ws1 = XLSX.utils.aoa_to_sheet(impactRows);
+    ws1['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 24 }, { wch: 10 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Pricing Impact');
+
+    // Copilot sheet
+    const cpRows = [
+      ['Copilot Productivity Savings'],
+      [],
+      ['Qty of Copilot Licenses', 'Rate per License', 'Total Productivity Savings'],
+      [data.cpQty, COPILOT_RATE, data.cpTotal],
+      [],
+      ['Assumptions:'],
+      ['Copilot adoption rate', '70%'],
+      ['Monthly hourly productivity savings', '8 hours'],
+      ['Average annual salary', '$53/hour']
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(cpRows);
+    ws2['!cols'] = [{ wch: 28 }, { wch: 18 }, { wch: 26 }];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Copilot Savings');
+
+    // Summary sheet
+    const summaryRows = [
+      ['Impact Calculator — Summary'],
+      [],
+      ['Total Pricing Impact', data.impactTotal],
+      ['Copilot Productivity Savings', data.cpTotal],
+      ['Combined Total Impact', data.grandTotal]
+    ];
+    const ws3 = XLSX.utils.aoa_to_sheet(summaryRows);
+    ws3['!cols'] = [{ wch: 32 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, ws3, 'Summary');
+
+    XLSX.writeFile(wb, 'Impact_Calculator_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  }
+
+  function exportPDF() {
+    const data = collectData();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.setTextColor(0, 90, 158);
+    doc.text('Impact Calculator', 14, 18);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text('Generated: ' + new Date().toLocaleString(), 14, 24);
+
+    // Pricing Impact table
+    doc.setFontSize(12);
+    doc.setTextColor(0, 90, 158);
+    doc.text('Pricing Impact', 14, 34);
+
+    const tableBody = data.rows.map(r => [
+      r.row,
+      fmtCurrency(r.msrp),
+      fmtCurrency(r.cpp),
+      r.qty,
+      fmtCurrency(r.impact)
+    ]);
+
+    doc.autoTable({
+      startY: 38,
+      head: [['#', 'MSRP', 'Customer Price', 'Qty', 'Impact']],
+      body: tableBody.length ? tableBody : [['—', '—', '—', '—', '—']],
+      foot: [['', '', '', 'Total', fmtCurrency(data.impactTotal)]],
+      headStyles: { fillColor: [0, 120, 212] },
+      footStyles: { fillColor: [220, 252, 231], textColor: [21, 128, 61], fontStyle: 'bold' },
+      styles: { fontSize: 9 }
+    });
+
+    let y = doc.lastAutoTable.finalY + 12;
+
+    // Copilot section
+    doc.setFontSize(12);
+    doc.setTextColor(0, 90, 158);
+    doc.text('Copilot Productivity Savings', 14, y);
+
+    doc.autoTable({
+      startY: y + 4,
+      head: [['Qty of Copilot Licenses', 'Rate per License', 'Total Savings']],
+      body: [[data.cpQty, fmtCurrency(COPILOT_RATE), fmtCurrency(data.cpTotal)]],
+      headStyles: { fillColor: [0, 120, 212] },
+      styles: { fontSize: 9 }
+    });
+
+    y = doc.lastAutoTable.finalY + 8;
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.text('Assumptions: 70% adoption rate; 8 hours/month productivity savings; $53/hour average salary.', 14, y);
+
+    // Grand total
+    y += 14;
+    doc.setFillColor(30, 64, 175);
+    doc.rect(14, y - 6, 182, 14, 'F');
+    doc.setTextColor(255);
+    doc.setFontSize(12);
+    doc.text('Combined Total Impact', 18, y + 2);
+    doc.setFontSize(14);
+    doc.text(fmtCurrency(data.grandTotal), 196, y + 2, { align: 'right' });
+
+    doc.save('Impact_Calculator_' + new Date().toISOString().slice(0,10) + '.pdf');
+  }
+
+  // Initialize
+  for (let i = 0; i < STARTING_ROWS; i++) addRow();
+  recalc();
+</script>
+</body>
+</html>
